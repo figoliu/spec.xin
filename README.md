@@ -101,7 +101,7 @@
 一次安装, 随处使用: 
 
 ```bash
-uv tool install specify-cn-cli --from git+https://github.com/linfee/spec-kit-cn.git
+uv tool install specify-cn-cli --from git+https://github.com/figoliu/spec.xin.git
 ```
 
 然后直接使用工具: 
