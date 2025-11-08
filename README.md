@@ -101,7 +101,7 @@
 一次安装, 随处使用: 
 
 ```bash
-uv tool install specify-cn-cli --from git+https://github.com/linfee/spec-kit-cn.git
+uv tool install specify-cn-cli --from git+https://github.com/figoliu/spec.xin.git
 ```
 
 然后直接使用工具: 
@@ -114,7 +114,7 @@ specify-cn check
 要升级 specify-cn, 运行: 
 
 ```bash
-uv tool install specify-cn-cli --force --from git+https://github.com/linfee/spec-kit-cn.git
+uv tool install specify-cn-cli --force --from git+https://github.com/figoliu/spec.xin.git
 ```
 
 #### 方式 2: 一次性使用
@@ -122,7 +122,7 @@ uv tool install specify-cn-cli --force --from git+https://github.com/linfee/spec
 直接运行, 无需安装: 
 
 ```bash
-uvx --from git+https://github.com/linfee/spec-kit-cn.git specify-cn init <PROJECT_NAME>
+uvx --from git+https://github.com/figoliu/spec.xin.git specify-cn init <PROJECT_NAME>
 ```
 
 **持久化安装的优势**:
@@ -294,7 +294,7 @@ specify-cn check
 | 命令              | 描述                                                           |
 | ------------------ | ------------------------------------------------------------- |
 | `/speckit.clarify`   | 澄清未充分说明的区域(建议在 `/speckit.plan` 之前运行; 以前为 `/quizme`) |
-| `/speckit.analyze`   | 跨工件一致性和覆盖范围分析(在 /speckit.tasks 之后, /speckit.implement 之前运行) |
+| `/speckit.analyze`   | 跨制品一致性和覆盖范围分析(在 /speckit.tasks 之后, /speckit.implement 之前运行) |
 | `/speckit.checklist` | 生成自定义质量检查清单, 验证需求的完整性、清晰性和一致性(类似"英文的单元测试") |
 
 ### 环境变量
@@ -368,7 +368,7 @@ specify-cn check
 <details>
 <summary>点击展开详细的分步演练</summary>
 
-你可以使用Specify CN CLI来引导你的项目, 这将在你的环境中引入所需的工件. 运行: 
+你可以使用Specify CN CLI来引导你的项目, 这将在你的环境中引入所需的制品. 运行: 
 
 ```bash
 specify-cn init <project_name>
