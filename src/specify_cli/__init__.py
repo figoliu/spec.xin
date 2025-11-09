@@ -354,7 +354,14 @@ class BannerGroup(TyperGroup):
     def format_help(self, ctx, formatter):
         # Show banner before help
         show_banner()
-        super().format_help(ctx, formatter)
+        # 直接使用Click的格式化方法，避免typer版本兼容性问题
+        try:
+            # 尝试调用父类方法
+            super().format_help(ctx, formatter)
+        except TypeError:
+            # 如果失败，使用基本的Click格式化
+            formatter.write_usage(ctx.command_path, ctx.help_option_names[0])
+            formatter.write_text(ctx.command.help or '')
 
 
 app = typer.Typer(
