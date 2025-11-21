@@ -10,7 +10,7 @@
 # ]
 # ///
 """
-Spec Kit CN CLI - Setup tool for Spec Kit CN projects
+Specify CN CLI - 设置工具，用于规范驱动开发项目
 
 Usage:
     uvx specify-cn-cli.py init <project-name>
@@ -51,6 +51,7 @@ from typer.core import TyperGroup
 import readchar
 import ssl
 import truststore
+from datetime import datetime, timezone
 
 ssl_context = truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
 client = httpx.Client(verify=ssl_context)
@@ -63,6 +64,63 @@ def _github_auth_headers(cli_token: str | None = None) -> dict:
     """Return Authorization header dict only when a non-empty token exists."""
     token = _github_token(cli_token)
     return {"Authorization": f"Bearer {token}"} if token else {}
+
+def _parse_rate_limit_headers(headers: httpx.Headers) -> dict:
+    """Extract and parse GitHub rate-limit headers."""
+    info = {}
+    
+    # Standard GitHub rate-limit headers
+    if "X-RateLimit-Limit" in headers:
+        info["limit"] = headers.get("X-RateLimit-Limit")
+    if "X-RateLimit-Remaining" in headers:
+        info["remaining"] = headers.get("X-RateLimit-Remaining")
+    if "X-RateLimit-Reset" in headers:
+        reset_epoch = int(headers.get("X-RateLimit-Reset", "0"))
+        if reset_epoch:
+            reset_time = datetime.fromtimestamp(reset_epoch, tz=timezone.utc)
+            info["reset_epoch"] = reset_epoch
+            info["reset_time"] = reset_time
+            info["reset_local"] = reset_time.astimezone()
+    
+    # Retry-After header (seconds or HTTP-date)
+    if "Retry-After" in headers:
+        retry_after = headers.get("Retry-After")
+        try:
+            info["retry_after_seconds"] = int(retry_after)
+        except ValueError:
+            # HTTP-date format - not implemented, just store as string
+            info["retry_after"] = retry_after
+    
+    return info
+
+def _format_rate_limit_error(status_code: int, headers: httpx.Headers, url: str) -> str:
+    """Format a user-friendly error message with rate-limit information."""
+    rate_info = _parse_rate_limit_headers(headers)
+    
+    lines = [f"GitHub API returned status {status_code} for {url}"]
+    lines.append("")
+    
+    if rate_info:
+        lines.append("[bold]Rate Limit Information:[/bold]")
+        if "limit" in rate_info:
+            lines.append(f"  • Rate Limit: {rate_info['limit']} requests/hour")
+        if "remaining" in rate_info:
+            lines.append(f"  • Remaining: {rate_info['remaining']}")
+        if "reset_local" in rate_info:
+            reset_str = rate_info["reset_local"].strftime("%Y-%m-%d %H:%M:%S %Z")
+            lines.append(f"  • Resets at: {reset_str}")
+        if "retry_after_seconds" in rate_info:
+            lines.append(f"  • Retry after: {rate_info['retry_after_seconds']} seconds")
+        lines.append("")
+    
+    # Add troubleshooting guidance
+    lines.append("[bold]Troubleshooting Tips:[/bold]")
+    lines.append("  • If you're on a shared CI or corporate environment, you may be rate-limited.")
+    lines.append("  • Consider using a GitHub token via --github-token or the GH_TOKEN/GITHUB_TOKEN")
+    lines.append("    environment variable to increase rate limits.")
+    lines.append("  • Authenticated requests have a limit of 5,000/hour vs 60/hour for unauthenticated.")
+    
+    return "\n".join(lines)
 
 # Agent configuration with name, folder, install URL, and CLI tool requirement
 AGENT_CONFIG = {
@@ -148,6 +206,12 @@ AGENT_CONFIG = {
         "name": "Amp",
         "folder": ".agents/",
         "install_url": "https://ampcode.com/manual#install",
+        "requires_cli": True,
+    },
+    "shai": {
+        "name": "SHAI",
+        "folder": ".shai/",
+        "install_url": "https://github.com/ovh/shai",
         "requires_cli": True,
     },
 }
@@ -366,7 +430,7 @@ class BannerGroup(TyperGroup):
 
 app = typer.Typer(
     name="specify-cn",
-    help="Spec Kit CN 规范驱动开发项目设置工具",
+    help="Setup tool for Specify CN spec-driven development projects",
     add_completion=False,
     invoke_without_command=True,
     cls=BannerGroup,
@@ -391,7 +455,7 @@ def callback(ctx: typer.Context):
     """Show banner when no subcommand is provided."""
     if ctx.invoked_subcommand is None and "--help" not in sys.argv and "-h" not in sys.argv:
         show_banner()
-        console.print(Align.center("[dim]运行 'specify-cn --help' 查看使用说明[/dim]"))
+        console.print(Align.center("[dim]Run 'specify --help' for usage information[/dim]"))
         console.print()
 
 def run_command(cmd: list[str], check_return: bool = True, capture: bool = False, shell: bool = False) -> Optional[str]:
@@ -480,7 +544,7 @@ def init_git_repo(project_path: Path, quiet: bool = False) -> Tuple[bool, Option
             console.print("[cyan]正在初始化Git仓库...[/cyan]")
         subprocess.run(["git", "init"], check=True, capture_output=True, text=True)
         subprocess.run(["git", "add", "."], check=True, capture_output=True, text=True)
-        subprocess.run(["git", "commit", "-m", "Initial commit from Spec Kit CN template"], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit from Specify template"], check=True, capture_output=True, text=True)
         if not quiet:
             console.print("[green]✓[/green] Git仓库已初始化")
         return True, None
@@ -566,8 +630,8 @@ def merge_json_files(existing_path: Path, new_content: dict, verbose: bool = Fal
     return merged
 
 def download_template_from_github(ai_assistant: str, download_dir: Path, *, script_type: str = "sh", verbose: bool = True, show_progress: bool = True, client: httpx.Client = None, debug: bool = False, github_token: str = None) -> Tuple[Path, dict]:
-    repo_owner = "linfee"
-    repo_name = "spec-kit-cn"
+    repo_owner = "github"
+    repo_name = "spec-kit"
     if client is None:
         client = httpx.Client(verify=ssl_context)
 
@@ -584,10 +648,11 @@ def download_template_from_github(ai_assistant: str, download_dir: Path, *, scri
         )
         status = response.status_code
         if status != 200:
-            msg = f"GitHub API returned {status} for {api_url}"
+            # Format detailed error message with rate-limit info
+            error_msg = _format_rate_limit_error(status, response.headers, api_url)
             if debug:
-                msg += f"\nResponse headers: {response.headers}\nBody (truncated 500): {response.text[:500]}"
-            raise RuntimeError(msg)
+                error_msg += f"\n\n[dim]Response body (truncated 500):[/dim]\n{response.text[:500]}"
+            raise RuntimeError(error_msg)
         try:
             release_data = response.json()
         except ValueError as je:
@@ -872,7 +937,7 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
 @app.command()
 def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here, or use '.' for current directory)"),
-    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, or q"),
+    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, amp, shai, or q"),
     script_type: str = typer.Option(None, "--script", help="Script type to use: sh or ps"),
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git repository initialization"),
