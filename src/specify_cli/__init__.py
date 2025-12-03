@@ -18,7 +18,7 @@ Usage:
     uvx specify-cn-cli.py init --here
 
 Or install globally:
-    uv tool install --from specify-cn-cli.py specify-cn-cli
+    uv tool install --from specify-cn-cli.py specify-cn
     specify-cn init <project-name>
     specify-cn init .
     specify-cn init --here
@@ -213,6 +213,12 @@ AGENT_CONFIG = {
         "folder": ".shai/",
         "install_url": "https://github.com/ovh/shai",
         "requires_cli": True,
+    },
+    "bob": {
+        "name": "IBM Bob",
+        "folder": ".bob/",
+        "install_url": None,  # IDE-based
+        "requires_cli": False,
     },
 }
 
@@ -430,7 +436,7 @@ class BannerGroup(TyperGroup):
 
 app = typer.Typer(
     name="specify-cn",
-    help="Setup tool for Specify CN spec-driven development projects",
+    help="Spec Kit CN 规范驱动开发项目设置工具",
     add_completion=False,
     invoke_without_command=True,
     cls=BannerGroup,
@@ -455,7 +461,7 @@ def callback(ctx: typer.Context):
     """Show banner when no subcommand is provided."""
     if ctx.invoked_subcommand is None and "--help" not in sys.argv and "-h" not in sys.argv:
         show_banner()
-        console.print(Align.center("[dim]Run 'specify --help' for usage information[/dim]"))
+        console.print(Align.center("[dim]运行 'specify-cn --help' 查看使用说明[/dim]"))
         console.print()
 
 def run_command(cmd: list[str], check_return: bool = True, capture: bool = False, shell: bool = False) -> Optional[str]:
@@ -544,7 +550,7 @@ def init_git_repo(project_path: Path, quiet: bool = False) -> Tuple[bool, Option
             console.print("[cyan]正在初始化Git仓库...[/cyan]")
         subprocess.run(["git", "init"], check=True, capture_output=True, text=True)
         subprocess.run(["git", "add", "."], check=True, capture_output=True, text=True)
-        subprocess.run(["git", "commit", "-m", "Initial commit from Specify template"], check=True, capture_output=True, text=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit from Spec Kit CN template"], check=True, capture_output=True, text=True)
         if not quiet:
             console.print("[green]✓[/green] Git仓库已初始化")
         return True, None
@@ -632,6 +638,7 @@ def merge_json_files(existing_path: Path, new_content: dict, verbose: bool = Fal
 def download_template_from_github(ai_assistant: str, download_dir: Path, *, script_type: str = "sh", verbose: bool = True, show_progress: bool = True, client: httpx.Client = None, debug: bool = False, github_token: str = None) -> Tuple[Path, dict]:
     repo_owner = "figoliu"
     repo_name = "spec.xin"
+
     if client is None:
         client = httpx.Client(verify=ssl_context)
 
@@ -891,7 +898,7 @@ def download_and_extract_template(project_path: Path, ai_assistant: str, script_
 
 
 def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = None) -> None:
-    """Ensure POSIX .sh scripts under .specify/scripts (recursively) have execute bits (no-op on Windows)."""
+    """确保 POSIX .sh 脚本在 .specify/scripts 下（递归）具有执行位（Windows 上无操作）。"""
     if os.name == "nt":
         return  # Windows: skip silently
     scripts_root = project_path / ".specify" / "scripts"
@@ -937,7 +944,7 @@ def ensure_executable_scripts(project_path: Path, tracker: StepTracker | None = 
 @app.command()
 def init(
     project_name: str = typer.Argument(None, help="Name for your new project directory (optional if using --here, or use '.' for current directory)"),
-    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, amp, shai, or q"),
+    ai_assistant: str = typer.Option(None, "--ai", help="AI assistant to use: claude, gemini, copilot, cursor-agent, qwen, opencode, codex, windsurf, kilocode, auggie, codebuddy, amp, shai, q, or bob"),
     script_type: str = typer.Option(None, "--script", help="Script type to use: sh or ps"),
     ignore_agent_tools: bool = typer.Option(False, "--ignore-agent-tools", help="Skip checks for AI agent tools like Claude Code"),
     no_git: bool = typer.Option(False, "--no-git", help="Skip git repository initialization"),
@@ -959,17 +966,17 @@ def init(
     6. Optionally set up AI assistant commands
     
     Examples:
-        specify init my-project
-        specify init my-project --ai claude
-        specify init my-project --ai copilot --no-git
-        specify init --ignore-agent-tools my-project
-        specify init . --ai claude         # Initialize in current directory
-        specify init .                     # Initialize in current directory (interactive AI selection)
-        specify init --here --ai claude    # Alternative syntax for current directory
-        specify init --here --ai codex
-        specify init --here --ai codebuddy
-        specify init --here
-        specify init --here --force  # Skip confirmation when current directory not empty
+        specify-cn init my-project
+        specify-cn init my-project --ai claude
+        specify-cn init my-project --ai copilot --no-git
+        specify-cn init --ignore-agent-tools my-project
+        specify-cn init . --ai claude         # Initialize in current directory
+        specify-cn init .                     # Initialize in current directory (interactive AI selection)
+        specify-cn init --here --ai claude    # Alternative syntax for current directory
+        specify-cn init --here --ai codex
+        specify-cn init --here --ai codebuddy
+        specify-cn init --here
+        specify-cn init --here --force  # Skip confirmation when current directory not empty
     """
 
     show_banner()
@@ -983,7 +990,7 @@ def init(
         raise typer.Exit(1)
 
     if not here and not project_name:
-        console.print("[red]错误:[/red] 必须指定项目名称，使用 '.' 表示当前目录，或使用 --here 标志")
+        console.print("[red]错误:[/red] 必须指定项目名称、使用 '.' 表示当前目录，或使用 --here 标志")
         raise typer.Exit(1)
 
     if here:
@@ -1234,7 +1241,7 @@ def init(
 
 @app.command()
 def check():
-    """Check that all required tools are installed."""
+    """检查所有必需工具是否已安装。"""
     show_banner()
     console.print("[bold]正在检查已安装的工具...[/bold]\n")
 
@@ -1266,13 +1273,92 @@ def check():
 
     console.print(tracker.render())
 
-    console.print("\n[bold green]Specify CLI已准备就绪！[/bold green]")
+    console.print("\n[bold green]Specify CN CLI 已准备就绪![/bold green]")
 
     if not git_ok:
-        console.print("[dim]提示: 安装git以进行仓库管理[/dim]")
+        console.print("[dim]提示: 安装 git 用于仓库管理[/dim]")
 
     if not any(agent_results.values()):
-        console.print("[dim]提示: 安装AI助手以获得最佳体验[/dim]")
+        console.print("[dim]提示: 安装 AI 助手以获得最佳体验[/dim]")
+
+@app.command()
+def version():
+    """显示版本和系统信息。"""
+    import platform
+    import importlib.metadata
+    
+    show_banner()
+    
+    # Get CLI version from package metadata
+    cli_version = "unknown"
+    try:
+        cli_version = importlib.metadata.version("specify-cn-cli")
+    except Exception:
+        # Fallback: try reading from pyproject.toml if running from source
+        try:
+            import tomllib
+            pyproject_path = Path(__file__).parent.parent.parent / "pyproject.toml"
+            if pyproject_path.exists():
+                with open(pyproject_path, "rb") as f:
+                    data = tomllib.load(f)
+                    cli_version = data.get("project", {}).get("version", "unknown")
+        except Exception:
+            pass
+    
+    # Fetch latest template release version
+    repo_owner = "figoliu"
+    repo_name = "spec.xin"
+    api_url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/releases/latest"
+    
+    template_version = "unknown"
+    release_date = "unknown"
+    
+    try:
+        response = client.get(
+            api_url,
+            timeout=10,
+            follow_redirects=True,
+            headers=_github_auth_headers(),
+        )
+        if response.status_code == 200:
+            release_data = response.json()
+            template_version = release_data.get("tag_name", "unknown")
+            # Remove 'v' prefix if present
+            if template_version.startswith("v"):
+                template_version = template_version[1:]
+            release_date = release_data.get("published_at", "unknown")
+            if release_date != "unknown":
+                # Format the date nicely
+                try:
+                    dt = datetime.fromisoformat(release_date.replace('Z', '+00:00'))
+                    release_date = dt.strftime("%Y-%m-%d")
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    info_table = Table(show_header=False, box=None, padding=(0, 2))
+    info_table.add_column("Key", style="cyan", justify="right")
+    info_table.add_column("Value", style="white")
+
+    info_table.add_row("CLI Version", cli_version)
+    info_table.add_row("Template Version", template_version)
+    info_table.add_row("Released", release_date)
+    info_table.add_row("", "")
+    info_table.add_row("Python", platform.python_version())
+    info_table.add_row("Platform", platform.system())
+    info_table.add_row("Architecture", platform.machine())
+    info_table.add_row("OS Version", platform.version())
+
+    panel = Panel(
+        info_table,
+        title="[bold cyan]Specify CLI Information[/bold cyan]",
+        border_style="cyan",
+        padding=(1, 2)
+    )
+
+    console.print(panel)
+    console.print()
 
 def main():
     app()
